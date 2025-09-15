@@ -13,5 +13,5 @@ export type User = {
 };
 
 export type TodoAndUser = Todo & {
-  user?: User;
+  user: User;
 };

@@ -2,17 +2,31 @@ import './App.scss';
 
 import usersFromServer from './api/users';
 import todosFromServer from './api/todos';
-import { useState } from 'react';
-import { TodoAndUser } from './components/Types/Types';
+import { useState, useMemo } from 'react';
+import { TodoAndUser, Todo, User } from './components/Types/Types';
 import { TodoList } from './components/TodoList';
 
-const getTodoWithUser = todosFromServer.map(todo => ({
-  ...todo,
-  user: usersFromServer.find(us => us.id === todo.userId),
-}));
+const mapTodosWithUsers = (todos: Todo[], users: User[]): TodoAndUser[] => {
+  return todos
+    .map(todo => {
+      const foundUser = users.find(user => user.id === todo.userId);
+
+      if (!foundUser) {
+        return null;
+      }
+
+      return { ...todo, user: foundUser };
+    })
+    .filter((t): t is TodoAndUser => t !== null);
+};
 
 export const App = () => {
-  const [todos, setTodos] = useState<TodoAndUser[]>(getTodoWithUser);
+  const initialTodos = useMemo(
+    () => mapTodosWithUsers(todosFromServer, usersFromServer),
+    [],
+  );
+
+  const [todos, setTodos] = useState<TodoAndUser[]>(initialTodos);
 
   const [title, setTitle] = useState('');
   const [currentUserId, setCurrentUserId] = useState(0);
@@ -50,19 +64,28 @@ export const App = () => {
       return;
     }
 
-    const newTodo = {
-      id: Math.max(...todos.map(todo => todo.id)) + 1,
-      title: isValidTitle,
+    const foundUser = usersFromServer.find(user => user.id === currentUserId);
+
+    if (!foundUser) {
+      setUserError(true);
+
+      return;
+    }
+
+    const newId = Math.max(0, ...todos.map(todo => todo.id)) + 1;
+
+    const newTodo: TodoAndUser = {
+      id: newId,
+      title: isValidTitle.trim(),
       userId: currentUserId,
       completed: false,
-      user: usersFromServer.find(u => u.id === currentUserId),
+      user: foundUser,
     };
 
-    setTodos([...todos, newTodo]);
+    setTodos(prev => [...prev, newTodo]);
 
     setTitle('');
     setCurrentUserId(0);
-
     setTitleError(false);
     setUserError(false);
   };
@@ -75,6 +98,7 @@ export const App = () => {
         <div className="field">
           <label htmlFor="title-input">Title: </label>
           <input
+            id="title-input"
             type="text"
             placeholder="Enter a title"
             name="title-input"
@@ -88,6 +112,7 @@ export const App = () => {
         <div className="field">
           <label htmlFor="user-selection">User: </label>
           <select
+            id="user-selection"
             data-cy="userSelect"
             value={currentUserId}
             onChange={handleOnSelect}
