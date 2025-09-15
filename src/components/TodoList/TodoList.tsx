@@ -1,9 +1,9 @@
 import React from 'react';
-import { Todo } from '../../interfaces/Todos';
+import { TodoAndUser } from '../Types/Types';
 import { TodoInfo } from '../TodoInfo';
 
 interface Props {
-  todos: Todo[];
+  todos: TodoAndUser[];
 }
 
 export const TodoList: React.FC<Props> = ({ todos }) => {

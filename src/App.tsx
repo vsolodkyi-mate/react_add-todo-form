@@ -2,118 +2,116 @@ import './App.scss';
 
 import usersFromServer from './api/users';
 import todosFromServer from './api/todos';
-import { Todo } from './interfaces/Todos';
-import { TodoList } from './components/TodoList';
-import { User } from './interfaces/User';
 import { useState } from 'react';
-import { findUserById } from './utils/findByUserId';
+import { TodoAndUser } from './components/Types/Types';
+import { TodoList } from './components/TodoList';
+
+const getTodoWithUser = todosFromServer.map(todo => ({
+  ...todo,
+  user: usersFromServer.find(us => us.id === todo.userId),
+}));
 
 export const App = () => {
-  const [todos, setTodos] = useState<Todo[]>(
-    todosFromServer.map(todo => ({
-      ...todo,
-      user: findUserById(todo.userId),
-    })),
-  );
-  const users: User[] = usersFromServer;
-  const [currentOption, setCurrentOption] = useState(0);
+  const [todos, setTodos] = useState<TodoAndUser[]>(getTodoWithUser);
+
   const [title, setTitle] = useState('');
-  const [errorObj, setErrorObj] = useState({
-    titleInput: false,
-    nameInput: false,
-  });
-  const isSubmitEnabled = title.trim() && currentOption;
+  const [currentUserId, setCurrentUserId] = useState(0);
+
+  const [titleError, setTitleError] = useState(false);
+  const [userError, setUserError] = useState(false);
+
+  const handleOnTitle = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setTitle(event.target.value);
+    setTitleError(false);
+  };
+
+  const handleOnSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setCurrentUserId(+event.target.value);
+    setUserError(false);
+  };
+
+  const handleFormSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    let isValidValues = true;
+    const isValidTitle = title.replace(/[^a-zA-Zа-яА-ЯёЁіІїЇєЄ0-9 ]/g, '');
+
+    if (!isValidTitle.trim()) {
+      setTitleError(true);
+      isValidValues = false;
+    }
+
+    if (currentUserId === 0) {
+      setUserError(true);
+      isValidValues = false;
+    }
+
+    if (!isValidValues) {
+      return;
+    }
+
+    const newTodo = {
+      id: Math.max(...todos.map(todo => todo.id)) + 1,
+      title: isValidTitle,
+      userId: currentUserId,
+      completed: false,
+      user: usersFromServer.find(u => u.id === currentUserId),
+    };
+
+    setTodos([...todos, newTodo]);
+
+    setTitle('');
+    setCurrentUserId(0);
+
+    setTitleError(false);
+    setUserError(false);
+  };
 
   return (
     <div className="App">
       <h1>Add todo form</h1>
 
-      <form
-        action="/api/todos"
-        method="POST"
-        onSubmit={event => {
-          event.preventDefault();
-
-          const maxId =
-            todos.length > 0 ? Math.max(...todos.map(todo => todo.id)) : 0;
-          const newTodo = {
-            id: maxId + 1,
-            title: title,
-            completed: false,
-            userId: currentOption,
-            user: findUserById(currentOption),
-          };
-
-          if (!title.trim()) {
-            setErrorObj(prevState => ({
-              ...prevState,
-              titleInput: true,
-            }));
-          }
-
-          if (!currentOption) {
-            setErrorObj(prevState => ({
-              ...prevState,
-              nameInput: true,
-            }));
-          }
-
-          if (isSubmitEnabled) {
-            setTodos(prevState => [...prevState, newTodo]);
-            setTitle('');
-            setCurrentOption(0);
-          }
-        }}
-      >
+      <form action="/api/todos" onSubmit={handleFormSubmit} method="POST">
         <div className="field">
+          <label htmlFor="title-input">Title: </label>
           <input
             type="text"
-            data-cy="titleInput"
-            placeholder="Enter title here"
+            placeholder="Enter a title"
+            name="title-input"
             value={title}
-            onChange={event => {
-              setTitle(event.target.value);
-              setErrorObj(prevState => ({
-                ...prevState,
-                titleInput: false,
-              }));
-            }}
+            data-cy="titleInput"
+            onChange={handleOnTitle}
           />
-          {title === '' && errorObj.titleInput && (
-            <span className="error">Please enter a title</span>
-          )}
+          {titleError && <span className="error">Please enter a title</span>}
         </div>
 
         <div className="field">
+          <label htmlFor="user-selection">User: </label>
           <select
             data-cy="userSelect"
-            value={currentOption}
-            onChange={event => {
-              setCurrentOption(+event.target.value);
-              setErrorObj(prevState => ({
-                ...prevState,
-                nameInput: false,
-              }));
-            }}
+            value={currentUserId}
+            onChange={handleOnSelect}
+            name="user-selection"
           >
             <option value="0" disabled>
               Choose a user
             </option>
-            {users.map(user => (
-              <option value={user.id} key={user.id}>
+
+            {usersFromServer.map(user => (
+              <option key={user.id} value={user.id}>
                 {user.name}
               </option>
             ))}
           </select>
-          {currentOption === 0 && errorObj.nameInput && (
-            <span className="error">Please choose a user</span>
-          )}
+
+          {userError && <span className="error">Please choose a user</span>}
         </div>
 
         <button type="submit" data-cy="submitButton">
           Add
         </button>
       </form>
+
       <TodoList todos={todos} />
     </div>
   );
